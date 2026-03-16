@@ -7,7 +7,8 @@ const SAMPLE_INTERVAL = 6; // sample every 6th month for chart performance
  * Calculate probability of ruin using rolling historical start dates.
  * Runs the simulation from every possible starting month that allows
  * at least `windowMonths` months of data.
- * Also returns downsampled trial paths for the spaghetti chart.
+ * Also returns downsampled trial paths for the spaghetti chart,
+ * plus sustainability metrics (median ending value, % declining, etc.)
  */
 export function calculateProbabilityOfRuin(params, windowMonths) {
   const allDates = getAllAvailableDates(params.vehicle);
@@ -21,6 +22,10 @@ export function calculateProbabilityOfRuin(params, windowMonths) {
       worstTimeToRuinMonths: null,
       trialPaths: [],
       windowMonths,
+      medianEndingValue: null,
+      pctDeclining: null,
+      percentile10EndingValue: null,
+      percentile90EndingValue: null,
     };
   }
 
@@ -29,6 +34,7 @@ export function calculateProbabilityOfRuin(params, windowMonths) {
   let ruins = 0;
   const ruinDurations = [];
   const trialPaths = [];
+  const endingValues = [];
 
   for (const startDate of allDates) {
     const availableMonths = dateDiffMonths(startDate, lastDate);
@@ -48,6 +54,11 @@ export function calculateProbabilityOfRuin(params, windowMonths) {
       ruins++;
       ruinDurations.push(result.ruinMonths);
     }
+
+    // Track the ending portfolio value at the window boundary
+    const endIdx = Math.min(windowMonths, result.months.length) - 1;
+    const endingValue = isRuined ? 0 : result.months[endIdx].nominalValue;
+    endingValues.push(endingValue);
 
     // Collect downsampled path for spaghetti chart
     const values = [];
@@ -83,6 +94,20 @@ export function calculateProbabilityOfRuin(params, windowMonths) {
     worstTimeToRuinMonths = ruinDurations[0]; // fastest ruin
   }
 
+  // Sustainability metrics
+  endingValues.sort((a, b) => a - b);
+  const medianEndingValue = endingValues.length > 0
+    ? endingValues[Math.floor(endingValues.length / 2)]
+    : null;
+  const percentile10EndingValue = endingValues.length > 0
+    ? endingValues[Math.floor(endingValues.length * 0.1)]
+    : null;
+  const percentile90EndingValue = endingValues.length > 0
+    ? endingValues[Math.floor(endingValues.length * 0.9)]
+    : null;
+  const decliningCount = endingValues.filter(v => v < params.startingCapital).length;
+  const pctDeclining = trials > 0 ? decliningCount / trials : null;
+
   return {
     probabilityOfRuin: trials > 0 ? ruins / trials : 0,
     trialsRun: trials,
@@ -92,5 +117,9 @@ export function calculateProbabilityOfRuin(params, windowMonths) {
     worstTimeToRuinMonths,
     trialPaths,
     windowMonths,
+    medianEndingValue,
+    pctDeclining,
+    percentile10EndingValue,
+    percentile90EndingValue,
   };
 }

@@ -28,6 +28,7 @@ export default function ResultsPanel({ simulationResult, benchmarkResult, ruinSt
         ruinStats={ruinStats}
         simulationResult={simulationResult}
         startDate={params.startDate}
+        startingCapital={params.startingCapital}
       />
       <Disclaimer />
     </div>

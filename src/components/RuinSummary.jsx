@@ -64,7 +64,42 @@ function RollingWindowDiagram({ windowYears, trialsRun }) {
   );
 }
 
-export default function RuinSummary({ ruinStats, simulationResult, startDate }) {
+function formatDollar(value) {
+  if (value == null) return 'N/A';
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+}
+
+/**
+ * Determine the overall "health" of the plan based on ruin probability
+ * AND sustainability metrics (is the portfolio shrinking even if not ruined?)
+ */
+function getHealthLevel(probabilityOfRuin, pctDeclining, medianEndingValue, startingCapital) {
+  // Hard ruin: many trials hit $0
+  if (probabilityOfRuin >= 0.3) return 'danger';
+  if (probabilityOfRuin >= 0.1) return 'warning';
+
+  // Soft ruin: portfolio is shrinking in most scenarios even if it hasn't hit $0
+  if (pctDeclining != null && medianEndingValue != null) {
+    const medianReturnRatio = medianEndingValue / startingCapital;
+    // If > 70% of scenarios end below starting capital, it's unsustainable
+    if (pctDeclining >= 0.7 || medianReturnRatio < 0.5) return 'warning';
+    // If > 50% declining and median is only modestly above, caution
+    if (pctDeclining >= 0.5 && medianReturnRatio < 1.5) return 'caution';
+  }
+
+  return 'healthy';
+}
+
+const healthStyles = {
+  danger:  { colorClass: 'text-red-700',    bgClass: 'bg-red-50',    borderClass: 'border-red-200' },
+  warning: { colorClass: 'text-yellow-700',  bgClass: 'bg-yellow-50',  borderClass: 'border-yellow-200' },
+  caution: { colorClass: 'text-amber-600',   bgClass: 'bg-amber-50',   borderClass: 'border-amber-200' },
+  healthy: { colorClass: 'text-green-700',   bgClass: 'bg-green-50',   borderClass: 'border-green-200' },
+};
+
+export default function RuinSummary({ ruinStats, simulationResult, startDate, startingCapital }) {
   const [showExplanation, setShowExplanation] = useState(false);
 
   if (!ruinStats) return null;
@@ -73,25 +108,17 @@ export default function RuinSummary({ ruinStats, simulationResult, startDate }) 
     probabilityOfRuin, trialsRun, ruinCount,
     averageTimeToRuinMonths, worstTimeToRuinMonths,
     trialPaths, windowMonths,
+    medianEndingValue, pctDeclining,
+    percentile10EndingValue, percentile90EndingValue,
   } = ruinStats;
 
   const pctRuin = (probabilityOfRuin * 100).toFixed(1);
   const windowYears = Math.round(windowMonths / 12);
 
-  let colorClass, bgClass, borderClass;
-  if (probabilityOfRuin < 0.1) {
-    colorClass = 'text-green-700';
-    bgClass = 'bg-green-50';
-    borderClass = 'border-green-200';
-  } else if (probabilityOfRuin < 0.3) {
-    colorClass = 'text-yellow-700';
-    bgClass = 'bg-yellow-50';
-    borderClass = 'border-yellow-200';
-  } else {
-    colorClass = 'text-red-700';
-    bgClass = 'bg-red-50';
-    borderClass = 'border-red-200';
-  }
+  const health = getHealthLevel(probabilityOfRuin, pctDeclining, medianEndingValue, startingCapital);
+  const { colorClass, bgClass, borderClass } = healthStyles[health];
+
+  const pctDecliningDisplay = pctDeclining != null ? (pctDeclining * 100).toFixed(0) : null;
 
   return (
     <div>
@@ -132,6 +159,44 @@ export default function RuinSummary({ ruinStats, simulationResult, startDate }) 
                 <p className="text-xs text-gray-400">Fastest Ruin</p>
                 <p className="font-medium text-gray-900">{formatMonths(worstTimeToRuinMonths)}</p>
               </div>
+            </div>
+          )}
+
+          {/* Portfolio sustainability metrics */}
+          {medianEndingValue != null && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                Portfolio Outlook ({windowYears}-year horizon)
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-gray-400">Median Ending Value</p>
+                  <p className="font-medium text-gray-900">{formatDollar(medianEndingValue)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Scenarios Ending Below Start</p>
+                  <p className={`font-medium ${pctDeclining >= 0.5 ? 'text-red-600' : 'text-gray-900'}`}>
+                    {pctDecliningDisplay}%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Worst 10% End Below</p>
+                  <p className="font-medium text-gray-900">{formatDollar(percentile10EndingValue)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Best 10% End Above</p>
+                  <p className="font-medium text-gray-900">{formatDollar(percentile90EndingValue)}</p>
+                </div>
+              </div>
+
+              {/* Sustainability warning when ruin is 0% but portfolio is declining */}
+              {probabilityOfRuin === 0 && pctDeclining >= 0.5 && (
+                <div className="mt-3 p-2.5 bg-yellow-100/80 rounded-lg text-xs text-yellow-800">
+                  <strong>Caution:</strong> While no historical scenario hit $0, {pctDecliningDisplay}% of
+                  scenarios ended with less than your starting capital. Your withdrawal rate may not be
+                  sustainable long-term.
+                </div>
+              )}
             </div>
           )}
 
