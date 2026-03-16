@@ -3,7 +3,7 @@ import NetReturnChart from './NetReturnChart';
 import RuinSummary from './RuinSummary';
 import Disclaimer from './Disclaimer';
 
-export default function ResultsPanel({ simulationResult, benchmarkResult, ruinStats, params }) {
+export default function ResultsPanel({ simulationResult, benchmarkResult, ruinStats, monteCarloStats, params }) {
   if (!simulationResult?.months?.length) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
@@ -26,6 +26,7 @@ export default function ResultsPanel({ simulationResult, benchmarkResult, ruinSt
       />
       <RuinSummary
         ruinStats={ruinStats}
+        monteCarloStats={monteCarloStats}
         simulationResult={simulationResult}
         startDate={params.startDate}
         startingCapital={params.startingCapital}

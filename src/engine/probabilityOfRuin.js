@@ -56,9 +56,9 @@ export function calculateProbabilityOfRuin(params, windowMonths) {
     }
 
     // Track the ending portfolio value at the window boundary
+    // Simulation now continues past ruin, so always use actual ending value
     const endIdx = Math.min(windowMonths, result.months.length) - 1;
-    const endingValue = isRuined ? 0 : result.months[endIdx].nominalValue;
-    endingValues.push(endingValue);
+    endingValues.push(result.months[endIdx].nominalValue);
 
     // Collect downsampled path for spaghetti chart
     const values = [];

@@ -18,6 +18,7 @@ import {
  * @param {boolean} params.keepAdding
  * @param {number} params.monthlyContribution
  * @param {number} params.monthlySpending
+ * @param {number} [params.ruinThreshold=0.5] - fraction of startingCapital that counts as ruin (0.5 = 50% drawdown)
  * @returns {Object} simulation result
  */
 export function runSimulation(params) {
@@ -30,12 +31,15 @@ export function runSimulation(params) {
     keepAdding,
     monthlyContribution,
     monthlySpending,
+    ruinThreshold = 0.5,
   } = params;
 
   const dates = getDateRange(startDate, vehicle);
   if (dates.length === 0) {
     return { months: [], isRuined: false, ruinDate: null, ruinMonths: null, finalValue: 0 };
   }
+
+  const ruinLevel = startingCapital * ruinThreshold;
 
   let portfolioValue = startingCapital;
   let currentMonthlySpending = monthlySpending;
@@ -63,8 +67,8 @@ export function runSimulation(params) {
       }
     }
 
-    if (!isRuined) {
-      // Apply investment return
+    // Apply investment return (continue even after ruin so charts show full path)
+    if (portfolioValue > 0) {
       const monthlyReturn = getMonthlyReturn(vehicle, date);
       portfolioValue *= (1 + monthlyReturn);
 
@@ -78,13 +82,17 @@ export function runSimulation(params) {
       portfolioValue -= currentMonthlySpending;
       totalWithdrawals += currentMonthlySpending;
 
-      // Check for ruin
+      // Clamp to zero if fully depleted
       if (portfolioValue <= 0) {
         portfolioValue = 0;
-        isRuined = true;
-        ruinDate = date;
-        ruinMonths = i + 1;
       }
+    }
+
+    // Check for ruin (50% drawdown threshold) — only record the first time
+    if (!isRuined && portfolioValue <= ruinLevel) {
+      isRuined = true;
+      ruinDate = date;
+      ruinMonths = i + 1;
     }
 
     // Calculate display value

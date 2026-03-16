@@ -87,3 +87,34 @@ export function getFirstAvailableDate(vehicle) {
   const source = vehicle === 'ndx' ? allNdxDates : allSpxDates;
   return source[0];
 }
+
+/**
+ * Returns paired arrays of monthly market returns and month-over-month CPI
+ * inflation rates for bootstrap Monte Carlo sampling.
+ * Pairing preserves the correlation between returns and inflation.
+ */
+export function getPairedReturnsAndInflation(vehicle) {
+  const dates = vehicle === 'ndx' ? allNdxDates : allSpxDates;
+  const pairs = [];
+
+  for (const date of dates) {
+    const monthReturn = vehicle === 'cash'
+      ? (fedFundsMap.get(date) ?? 0) / 12
+      : (vehicle === 'ndx' ? ndxMap.get(date) : spxMap.get(date)) ?? 0;
+
+    // Month-over-month CPI change
+    const [year, month] = date.split('-').map(Number);
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    const prevDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    const currCpi = cpiMap.get(date);
+    const prevCpi = cpiMap.get(prevDate);
+    const cpiMonthlyRate = (currCpi != null && prevCpi != null)
+      ? (currCpi / prevCpi) - 1
+      : 0;
+
+    pairs.push({ monthReturn, cpiMonthlyRate });
+  }
+
+  return pairs;
+}

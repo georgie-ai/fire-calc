@@ -17,7 +17,7 @@ const DEFAULT_PARAMS = {
 
 function App() {
   const [params, setParams] = useState(DEFAULT_PARAMS);
-  const { simulationResult, benchmarkResult, ruinStats } = useSimulation(params);
+  const { simulationResult, benchmarkResult, ruinStats, monteCarloStats } = useSimulation(params);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -34,6 +34,7 @@ function App() {
               simulationResult={simulationResult}
               benchmarkResult={benchmarkResult}
               ruinStats={ruinStats}
+              monteCarloStats={monteCarloStats}
               params={params}
             />
           </div>

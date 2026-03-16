@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { runSimulation, runTotalReturnSimulation } from '../engine/simulate';
 import { calculateProbabilityOfRuin } from '../engine/probabilityOfRuin';
+import { calculateMonteCarloRuin } from '../engine/monteCarloRuin';
 import { dateDiffMonths, getLastAvailableDate } from '../engine/dataHelpers';
 
 export function useSimulation(params) {
@@ -48,5 +49,31 @@ export function useSimulation(params) {
     params.monthlySpending,
   ]);
 
-  return { simulationResult, benchmarkResult, ruinStats };
+  // Monte Carlo bootstrap simulation
+  const monteCarloStats = useMemo(() => {
+    const lastDate = getLastAvailableDate(params.vehicle);
+    if (!lastDate) return null;
+    const totalMonths = dateDiffMonths(params.startDate, lastDate);
+    if (totalMonths <= 0) return null;
+    const windowMonths = Math.min(totalMonths, 30 * 12);
+    return calculateMonteCarloRuin({
+      startingCapital: params.startingCapital,
+      monthlySpending: params.monthlySpending,
+      monthlyContribution: params.monthlyContribution,
+      keepAdding: params.keepAdding,
+      vehicle: params.vehicle,
+      inflationMode: params.inflationMode,
+      windowMonths,
+    });
+  }, [
+    params.startingCapital,
+    params.startDate,
+    params.vehicle,
+    params.inflationMode,
+    params.keepAdding,
+    params.monthlyContribution,
+    params.monthlySpending,
+  ]);
+
+  return { simulationResult, benchmarkResult, ruinStats, monteCarloStats };
 }

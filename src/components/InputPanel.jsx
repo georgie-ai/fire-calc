@@ -1,4 +1,6 @@
 const START_DATES = [
+  { label: '1960', value: '1960-01' },
+  { label: '1970', value: '1970-01' },
   { label: '1980', value: '1980-01' },
   { label: '1990', value: '1990-01' },
   { label: '2000', value: '2000-01' },
@@ -100,8 +102,9 @@ function SelectInput({ label, value, onChange, options, note }) {
 export default function InputPanel({ params, onChange }) {
   const update = (key) => (value) => onChange({ ...params, [key]: value });
 
+  const startYear = parseInt(params.startDate.split('-')[0], 10);
   const ndxWarning =
-    params.vehicle === 'ndx' && params.startDate === '1980-01'
+    params.vehicle === 'ndx' && startYear < 1985
       ? 'NDX data starts from 1985. Simulation will begin from Jan 1985.'
       : null;
 

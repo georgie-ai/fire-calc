@@ -13,31 +13,31 @@ function formatMonths(totalMonths) {
 function formatTooltipDate(dateStr) {
   if (!dateStr) return 'N/A';
   const [year, month] = dateStr.split('-');
-  const months = [
+  const monthNames = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
-  return `${months[parseInt(month) - 1]} ${year}`;
+  return `${monthNames[parseInt(month) - 1]} ${year}`;
+}
+
+function formatDollar(value) {
+  if (value == null) return 'N/A';
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
 }
 
 function RollingWindowDiagram({ windowYears, trialsRun }) {
   const bars = [
-    { label: 'Jan 1980', offset: 0 },
-    { label: 'Jul 1982', offset: 1 },
-    { label: 'Jan 1985', offset: 2 },
-    { label: 'Jul 1987', offset: 3 },
+    { label: 'Window 1', offset: 0 },
+    { label: 'Window 2', offset: 1 },
+    { label: 'Window 3', offset: 2 },
+    { label: 'Window 4', offset: 3 },
     { label: '...', offset: 4 },
   ];
 
   return (
     <div className="mt-3 mb-1">
-      <div className="text-[10px] text-gray-400 flex justify-between mb-1 px-1">
-        <span>1980</span>
-        <span>1990</span>
-        <span>2000</span>
-        <span>2010</span>
-        <span>2025</span>
-      </div>
       <div className="relative bg-gray-100 rounded h-[88px] overflow-hidden">
         {bars.map((bar, i) => (
           <div
@@ -64,31 +64,14 @@ function RollingWindowDiagram({ windowYears, trialsRun }) {
   );
 }
 
-function formatDollar(value) {
-  if (value == null) return 'N/A';
-  if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
-  if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
-  return `$${value.toFixed(0)}`;
-}
-
 /**
- * Determine the overall "health" of the plan based on ruin probability
- * AND sustainability metrics (is the portfolio shrinking even if not ruined?)
+ * Determine the overall "health" using the worse of the two probabilities.
  */
-function getHealthLevel(probabilityOfRuin, pctDeclining, medianEndingValue, startingCapital) {
-  // Hard ruin: many trials hit $0
-  if (probabilityOfRuin >= 0.3) return 'danger';
-  if (probabilityOfRuin >= 0.1) return 'warning';
-
-  // Soft ruin: portfolio is shrinking in most scenarios even if it hasn't hit $0
-  if (pctDeclining != null && medianEndingValue != null) {
-    const medianReturnRatio = medianEndingValue / startingCapital;
-    // If > 70% of scenarios end below starting capital, it's unsustainable
-    if (pctDeclining >= 0.7 || medianReturnRatio < 0.5) return 'warning';
-    // If > 50% declining and median is only modestly above, caution
-    if (pctDeclining >= 0.5 && medianReturnRatio < 1.5) return 'caution';
-  }
-
+function getHealthLevel(histProb, mcProb) {
+  const worstProb = Math.max(histProb ?? 0, mcProb ?? 0);
+  if (worstProb >= 0.3) return 'danger';
+  if (worstProb >= 0.1) return 'warning';
+  if (worstProb >= 0.05) return 'caution';
   return 'healthy';
 }
 
@@ -99,64 +82,84 @@ const healthStyles = {
   healthy: { colorClass: 'text-green-700',   bgClass: 'bg-green-50',   borderClass: 'border-green-200' },
 };
 
-export default function RuinSummary({ ruinStats, simulationResult, startDate, startingCapital }) {
+export default function RuinSummary({ ruinStats, monteCarloStats, simulationResult, startDate, startingCapital }) {
   const [showExplanation, setShowExplanation] = useState(false);
 
   if (!ruinStats) return null;
 
   const {
-    probabilityOfRuin, trialsRun, ruinCount,
+    probabilityOfRuin: histProb, trialsRun: histTrials, ruinCount: histRuinCount,
     averageTimeToRuinMonths, worstTimeToRuinMonths,
     trialPaths, windowMonths,
     medianEndingValue, pctDeclining,
     percentile10EndingValue, percentile90EndingValue,
   } = ruinStats;
 
-  const pctRuin = (probabilityOfRuin * 100).toFixed(1);
+  const mcProb = monteCarloStats?.probabilityOfRuin ?? null;
+  const mcTrials = monteCarloStats?.trialsRun ?? 0;
+  const mcRuinCount = monteCarloStats?.ruinCount ?? 0;
+
+  const histPct = (histProb * 100).toFixed(1);
+  const mcPct = mcProb != null ? (mcProb * 100).toFixed(1) : null;
   const windowYears = Math.round(windowMonths / 12);
 
-  const health = getHealthLevel(probabilityOfRuin, pctDeclining, medianEndingValue, startingCapital);
+  const health = getHealthLevel(histProb, mcProb);
   const { colorClass, bgClass, borderClass } = healthStyles[health];
 
   const pctDecliningDisplay = pctDeclining != null ? (pctDeclining * 100).toFixed(0) : null;
+  const ruinThresholdDollar = formatDollar(startingCapital * 0.5);
 
   return (
     <div>
       <div className={`rounded-xl border-2 ${borderClass} ${bgClass} p-6`}>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Probability of Ruin</h3>
 
-        <div className="flex items-baseline gap-2 mb-4">
-          <span className={`text-5xl font-bold ${colorClass}`}>{pctRuin}%</span>
-          <span className="text-sm text-gray-500">chance of running out of money</span>
+        {/* Dual probability display */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Historical</p>
+            <span className={`text-4xl font-bold ${colorClass}`}>{histPct}%</span>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {histTrials} scenarios ({histRuinCount} ruined)
+            </p>
+          </div>
+          {mcPct != null && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Monte Carlo</p>
+              <span className={`text-4xl font-bold ${colorClass}`}>{mcPct}%</span>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {mcTrials.toLocaleString()} simulations ({mcRuinCount.toLocaleString()} ruined)
+              </p>
+            </div>
+          )}
         </div>
 
-        <div className="space-y-2 text-sm text-gray-600">
-          <p>
-            Based on <span className="font-medium text-gray-900">{trialsRun}</span> historical
-            scenarios ({ruinCount} resulted in ruin)
-          </p>
+        <p className="text-xs text-gray-500 mb-3">
+          Ruin = portfolio drops below {ruinThresholdDollar} (50% of starting capital)
+        </p>
 
+        <div className="space-y-2 text-sm text-gray-600">
           {simulationResult?.isRuined ? (
             <p className="text-red-600 font-medium">
-              Your selected scenario runs out of money in{' '}
+              Your selected scenario hits ruin threshold in{' '}
               {formatTooltipDate(simulationResult.ruinDate)} ({formatMonths(simulationResult.ruinMonths)}{' '}
               from start)
             </p>
           ) : (
             <p className="text-green-600 font-medium">
-              Your selected scenario ({startDate.split('-')[0]} start) survives through end of
-              available data
+              Your selected scenario ({startDate.split('-')[0]} start) stays above threshold through
+              end of available data
             </p>
           )}
 
-          {ruinCount > 0 && (
+          {histRuinCount > 0 && (
             <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-3">
               <div>
-                <p className="text-xs text-gray-400">Average Time to Ruin</p>
+                <p className="text-xs text-gray-400">Avg. Time to Ruin (Historical)</p>
                 <p className="font-medium text-gray-900">{formatMonths(averageTimeToRuinMonths)}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400">Fastest Ruin</p>
+                <p className="text-xs text-gray-400">Fastest Ruin (Historical)</p>
                 <p className="font-medium text-gray-900">{formatMonths(worstTimeToRuinMonths)}</p>
               </div>
             </div>
@@ -188,15 +191,6 @@ export default function RuinSummary({ ruinStats, simulationResult, startDate, st
                   <p className="font-medium text-gray-900">{formatDollar(percentile90EndingValue)}</p>
                 </div>
               </div>
-
-              {/* Sustainability warning when ruin is 0% but portfolio is declining */}
-              {probabilityOfRuin === 0 && pctDeclining >= 0.5 && (
-                <div className="mt-3 p-2.5 bg-yellow-100/80 rounded-lg text-xs text-yellow-800">
-                  <strong>Caution:</strong> While no historical scenario hit $0, {pctDecliningDisplay}% of
-                  scenarios ended with less than your starting capital. Your withdrawal rate may not be
-                  sustainable long-term.
-                </div>
-              )}
             </div>
           )}
 
@@ -219,22 +213,34 @@ export default function RuinSummary({ ruinStats, simulationResult, startDate, st
             </button>
 
             {showExplanation && (
-              <div className="mt-3 p-3 bg-white/60 rounded-lg text-xs text-gray-600 space-y-2">
-                <p>
-                  We replay your exact parameters (starting capital, spending, contributions,
-                  investment vehicle) across every possible <strong>{windowYears}-year window</strong> in
-                  our historical dataset (Jan 1980 &ndash; Dec 2025).
-                </p>
-                <p>
-                  Each window starts one month later than the previous, creating{' '}
-                  <strong>{trialsRun} independent scenarios</strong>. If your portfolio hits $0 in a
-                  scenario, that counts as &ldquo;ruin.&rdquo;
-                </p>
-                <RollingWindowDiagram windowYears={windowYears} trialsRun={trialsRun} />
-                <p>
-                  This uses <em>actual historical returns</em> in sequence (not random simulations),
-                  so it captures real events like the dot-com crash, 2008 crisis, and COVID crash.
-                </p>
+              <div className="mt-3 p-3 bg-white/60 rounded-lg text-xs text-gray-600 space-y-3">
+                <div>
+                  <p className="font-semibold text-gray-700 mb-1">Historical Analysis</p>
+                  <p>
+                    We replay your exact parameters across every possible{' '}
+                    <strong>{windowYears}-year window</strong> in our historical dataset. Each window
+                    starts one month later than the previous, creating{' '}
+                    <strong>{histTrials} independent scenarios</strong>. If your portfolio drops below
+                    50% of starting capital, that counts as &ldquo;ruin.&rdquo;
+                  </p>
+                  <RollingWindowDiagram windowYears={windowYears} trialsRun={histTrials} />
+                  <p>
+                    This uses <em>actual historical returns</em> in sequence, so it captures real events
+                    like the dot-com crash, 2008 crisis, and COVID crash.
+                  </p>
+                </div>
+                {mcPct != null && (
+                  <div>
+                    <p className="font-semibold text-gray-700 mb-1">Monte Carlo Simulation</p>
+                    <p>
+                      We also run <strong>{mcTrials.toLocaleString()} simulated paths</strong> by
+                      randomly sampling real historical monthly returns (bootstrap resampling). This
+                      tests your plan against thousands of possible market sequences &mdash; not just
+                      the ones that actually happened. It can reveal risks that the limited historical
+                      record might miss.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -243,7 +249,12 @@ export default function RuinSummary({ ruinStats, simulationResult, startDate, st
 
       {/* Spaghetti chart showing all trial paths */}
       {trialPaths && trialPaths.length > 0 && (
-        <RuinSpaghettiChart trialPaths={trialPaths} windowMonths={windowMonths} />
+        <RuinSpaghettiChart
+          trialPaths={trialPaths}
+          monteCarloTrialPaths={monteCarloStats?.trialPaths}
+          windowMonths={windowMonths}
+          ruinLevel={startingCapital * 0.5}
+        />
       )}
     </div>
   );
