@@ -254,6 +254,7 @@ export default function RuinSummary({ ruinStats, monteCarloStats, simulationResu
           monteCarloTrialPaths={monteCarloStats?.trialPaths}
           windowMonths={windowMonths}
           ruinLevel={startingCapital * 0.5}
+          startingCapital={startingCapital}
         />
       )}
     </div>

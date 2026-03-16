@@ -105,7 +105,7 @@ function SpaghettiTooltip({ active, payload, label }) {
   );
 }
 
-export default function RuinSpaghettiChart({ trialPaths, monteCarloTrialPaths, windowMonths, ruinLevel }) {
+export default function RuinSpaghettiChart({ trialPaths, monteCarloTrialPaths, windowMonths, ruinLevel, startingCapital }) {
   const { data: chartData, keys } = useMemo(() => {
     if (!trialPaths?.length) return { data: [], keys: [] };
     return buildChartData(trialPaths, monteCarloTrialPaths);
@@ -122,6 +122,13 @@ export default function RuinSpaghettiChart({ trialPaths, monteCarloTrialPaths, w
     });
     return meta;
   }, [trialPaths, monteCarloTrialPaths]);
+
+  // Cap Y-axis at 3x starting capital so the threshold line and most paths are visible.
+  // Paths that grow beyond this just clip off the top — the chart focuses on the ruin zone.
+  const yMax = useMemo(() => {
+    const cap = (startingCapital || 500000) * 3;
+    return cap;
+  }, [startingCapital]);
 
   if (!chartData.length) return null;
 
@@ -182,6 +189,8 @@ export default function RuinSpaghettiChart({ trialPaths, monteCarloTrialPaths, w
             stroke="#9ca3af"
           />
           <YAxis
+            domain={[0, yMax]}
+            allowDataOverflow
             tickFormatter={formatDollar}
             tick={{ fontSize: 12 }}
             stroke="#9ca3af"
