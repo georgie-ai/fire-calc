@@ -36,6 +36,15 @@ export function calculateProbabilityOfRuin(params, windowMonths) {
   const trialPaths = [];
   const endingValues = [];
 
+  // First pass: count eligible trials so we can limit chart paths
+  let eligibleCount = 0;
+  for (const startDate of allDates) {
+    if (dateDiffMonths(startDate, lastDate) < windowMonths) break;
+    eligibleCount++;
+  }
+  const CHART_PATHS = 100;
+  const chartStride = Math.max(1, Math.floor(eligibleCount / CHART_PATHS));
+
   for (const startDate of allDates) {
     const availableMonths = dateDiffMonths(startDate, lastDate);
     if (availableMonths < windowMonths) break;
@@ -60,25 +69,28 @@ export function calculateProbabilityOfRuin(params, windowMonths) {
     const endIdx = Math.min(windowMonths, result.months.length) - 1;
     endingValues.push(result.months[endIdx].nominalValue);
 
-    // Collect downsampled path for spaghetti chart
-    const values = [];
-    const effectiveWindow = Math.min(windowMonths, result.months.length);
-    for (let m = 0; m < effectiveWindow; m++) {
-      const isSamplePoint = m % SAMPLE_INTERVAL === 0;
-      const isLast = m === effectiveWindow - 1;
-      const isRuinPoint = isRuined && result.ruinMonths === m + 1;
+    // Collect downsampled path for spaghetti chart (limit to ~100 paths)
+    const recordPath = (trials - 1) % chartStride === 0;
+    if (recordPath) {
+      const values = [];
+      const effectiveWindow = Math.min(windowMonths, result.months.length);
+      for (let m = 0; m < effectiveWindow; m++) {
+        const isSamplePoint = m % SAMPLE_INTERVAL === 0;
+        const isLast = m === effectiveWindow - 1;
+        const isRuinPoint = isRuined && result.ruinMonths === m + 1;
 
-      if (isSamplePoint || isLast || isRuinPoint) {
-        values.push({ month: m, value: result.months[m].nominalValue });
+        if (isSamplePoint || isLast || isRuinPoint) {
+          values.push({ month: m, value: result.months[m].nominalValue });
+        }
       }
-    }
 
-    trialPaths.push({
-      startDate,
-      isRuined,
-      ruinMonth: isRuined ? result.ruinMonths : null,
-      values,
-    });
+      trialPaths.push({
+        startDate,
+        isRuined,
+        ruinMonth: isRuined ? result.ruinMonths : null,
+        values,
+      });
+    }
   }
 
   let averageTimeToRuinMonths = null;

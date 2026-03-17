@@ -215,7 +215,7 @@ export default function RuinSpaghettiChart({ trialPaths, monteCarloTrialPaths, w
           {keys.map((key) => (
             <Line
               key={key}
-              type="monotone"
+              type="linear"
               dataKey={key}
               stroke={getStroke(key)}
               strokeWidth={getStrokeWidth(key)}
