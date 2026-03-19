@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import RuinSpaghettiChart from './RuinSpaghettiChart';
 
 function formatMonths(totalMonths) {
   if (totalMonths == null) return 'N/A';
@@ -81,6 +80,108 @@ const healthStyles = {
   caution: { colorClass: 'text-amber-600',   bgClass: 'bg-amber-50',   borderClass: 'border-amber-200' },
   healthy: { colorClass: 'text-green-700',   bgClass: 'bg-green-50',   borderClass: 'border-green-200' },
 };
+
+function ScenarioCommentary({
+  histProb, mcProb, health, windowYears, startingCapital,
+  medianEndingValue, pctDeclining, averageTimeToRuinMonths,
+  percentile10EndingValue, percentile90EndingValue,
+}) {
+  const worstProb = Math.max(histProb ?? 0, mcProb ?? 0);
+  const bestProb = Math.min(histProb ?? 1, mcProb ?? 1);
+  const medianGrowth = medianEndingValue != null ? (medianEndingValue / startingCapital - 1) * 100 : null;
+
+  const bullets = [];
+
+  // Overall verdict
+  if (health === 'danger') {
+    if (worstProb >= 0.8) {
+      bullets.push('This plan has a very high probability of failure. At this withdrawal rate, the vast majority of historical and simulated scenarios end in ruin well before the end of the time horizon.');
+    } else if (worstProb >= 0.5) {
+      bullets.push('This plan fails in more than half of all scenarios tested. The withdrawal rate is too aggressive for the portfolio size.');
+    } else {
+      bullets.push('There is a significant risk of running out of money. More than 1 in 3 scenarios result in the portfolio dropping below the ruin threshold.');
+    }
+  } else if (health === 'warning') {
+    bullets.push(`Between 10–30% of scenarios result in ruin over ${windowYears} years. This plan could work, but has meaningful downside risk — especially if markets underperform early in retirement.`);
+  } else if (health === 'caution') {
+    bullets.push(`A small but non-trivial number of scenarios (5–10%) result in ruin. The plan is likely sustainable, but vulnerable to a severe early downturn like 2000–2002 or 2008.`);
+  } else {
+    bullets.push(`This plan survives the vast majority of historical and simulated scenarios over ${windowYears} years. The withdrawal rate appears sustainable.`);
+  }
+
+  // Median outcome
+  if (medianEndingValue != null) {
+    if (medianEndingValue <= 0) {
+      bullets.push('The median portfolio ends at $0 — meaning more than half of all scenarios are completely depleted by the end of the horizon.');
+    } else if (medianGrowth < -50) {
+      bullets.push(`The median portfolio loses more than half its value, ending at ${formatDollar(medianEndingValue)}. Even surviving scenarios see heavy erosion.`);
+    } else if (medianGrowth < 0) {
+      bullets.push(`The median portfolio shrinks to ${formatDollar(medianEndingValue)} — withdrawals outpace investment growth in the typical case.`);
+    } else if (medianGrowth > 100) {
+      bullets.push(`In the median case, the portfolio more than doubles to ${formatDollar(medianEndingValue)}, suggesting the withdrawal rate is conservative relative to historical growth.`);
+    } else if (medianGrowth > 0) {
+      bullets.push(`The median portfolio grows to ${formatDollar(medianEndingValue)}, indicating that investment returns generally outpace withdrawals.`);
+    }
+  }
+
+  // Tail risk
+  if (percentile10EndingValue != null && percentile90EndingValue != null) {
+    if (percentile10EndingValue <= 0 && percentile90EndingValue > startingCapital * 2) {
+      bullets.push(`Outcomes are extremely spread: the worst 10% are completely wiped out, while the best 10% end above ${formatDollar(percentile90EndingValue)}. Sequence-of-returns risk is the dominant factor.`);
+    } else if (percentile10EndingValue <= 0) {
+      bullets.push('The worst 10% of scenarios end with nothing. A bad stretch of early returns could be devastating.');
+    }
+  }
+
+  // Time to ruin
+  if (averageTimeToRuinMonths != null && health === 'danger') {
+    const avgYears = Math.floor(averageTimeToRuinMonths / 12);
+    if (avgYears <= 10) {
+      bullets.push(`When ruin does occur, it happens fast — on average within ${avgYears} years. There would be little time to course-correct.`);
+    } else {
+      bullets.push(`When ruin occurs, it takes an average of ${avgYears} years. Monitoring withdrawals and adjusting early could help avoid the worst outcomes.`);
+    }
+  }
+
+  // Actionable suggestion
+  if (health === 'danger' || health === 'warning') {
+    bullets.push('Consider reducing monthly withdrawals, increasing starting capital, or planning for part-time income in early retirement to improve sustainability.');
+  }
+
+  if (bullets.length === 0) return null;
+
+  const borderColor = {
+    danger: 'border-red-200',
+    warning: 'border-yellow-200',
+    caution: 'border-amber-200',
+    healthy: 'border-green-200',
+  }[health];
+
+  const iconColor = {
+    danger: 'text-red-500',
+    warning: 'text-yellow-500',
+    caution: 'text-amber-500',
+    healthy: 'text-green-500',
+  }[health];
+
+  return (
+    <div className={`mt-6 rounded-xl border ${borderColor} bg-white p-5`}>
+      <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+        <span className={iconColor}>
+          {health === 'healthy' ? '✓' : health === 'danger' ? '✗' : '⚠'}
+        </span>
+        Scenario Analysis
+      </h3>
+      <ul className="space-y-2">
+        {bullets.map((b, i) => (
+          <li key={i} className="text-sm text-gray-600 leading-relaxed">
+            {b}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function RuinSummary({ ruinStats, monteCarloStats, simulationResult, startDate, startingCapital }) {
   const [showExplanation, setShowExplanation] = useState(false);
@@ -247,16 +348,19 @@ export default function RuinSummary({ ruinStats, monteCarloStats, simulationResu
         </div>
       </div>
 
-      {/* Spaghetti chart showing all trial paths */}
-      {trialPaths && trialPaths.length > 0 && (
-        <RuinSpaghettiChart
-          trialPaths={trialPaths}
-          monteCarloTrialPaths={monteCarloStats?.trialPaths}
-          windowMonths={windowMonths}
-          ruinLevel={startingCapital * 0.5}
-          startingCapital={startingCapital}
-        />
-      )}
+      {/* Scenario commentary */}
+      <ScenarioCommentary
+        histProb={histProb}
+        mcProb={mcProb}
+        health={health}
+        windowYears={windowYears}
+        startingCapital={startingCapital}
+        medianEndingValue={medianEndingValue}
+        pctDeclining={pctDeclining}
+        averageTimeToRuinMonths={averageTimeToRuinMonths}
+        percentile10EndingValue={percentile10EndingValue}
+        percentile90EndingValue={percentile90EndingValue}
+      />
     </div>
   );
 }
