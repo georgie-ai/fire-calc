@@ -212,7 +212,21 @@ export default function RuinSummary({ ruinStats, monteCarloStats, simulationResu
 
   return (
     <div>
-      <div className={`rounded-xl border-2 ${borderClass} ${bgClass} p-6`}>
+      {/* Scenario commentary — first */}
+      <ScenarioCommentary
+        histProb={histProb}
+        mcProb={mcProb}
+        health={health}
+        windowYears={windowYears}
+        startingCapital={startingCapital}
+        medianEndingValue={medianEndingValue}
+        pctDeclining={pctDeclining}
+        averageTimeToRuinMonths={averageTimeToRuinMonths}
+        percentile10EndingValue={percentile10EndingValue}
+        percentile90EndingValue={percentile90EndingValue}
+      />
+
+      <div className={`mt-6 rounded-xl border-2 ${borderClass} ${bgClass} p-6`}>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Probability of Ruin</h3>
 
         {/* Dual probability display */}
@@ -348,19 +362,6 @@ export default function RuinSummary({ ruinStats, monteCarloStats, simulationResu
         </div>
       </div>
 
-      {/* Scenario commentary */}
-      <ScenarioCommentary
-        histProb={histProb}
-        mcProb={mcProb}
-        health={health}
-        windowYears={windowYears}
-        startingCapital={startingCapital}
-        medianEndingValue={medianEndingValue}
-        pctDeclining={pctDeclining}
-        averageTimeToRuinMonths={averageTimeToRuinMonths}
-        percentile10EndingValue={percentile10EndingValue}
-        percentile90EndingValue={percentile90EndingValue}
-      />
     </div>
   );
 }

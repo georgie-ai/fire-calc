@@ -14,6 +14,13 @@ export default function ResultsPanel({ simulationResult, benchmarkResult, ruinSt
 
   return (
     <div className="space-y-6">
+      <RuinSummary
+        ruinStats={ruinStats}
+        monteCarloStats={monteCarloStats}
+        simulationResult={simulationResult}
+        startDate={params.startDate}
+        startingCapital={params.startingCapital}
+      />
       <PortfolioChart
         data={simulationResult.months}
         benchmarkData={benchmarkResult?.months}
@@ -23,13 +30,6 @@ export default function ResultsPanel({ simulationResult, benchmarkResult, ruinSt
         data={simulationResult.months}
         benchmarkData={benchmarkResult?.months}
         inflationAdjusted={params.inflationAdjusted}
-      />
-      <RuinSummary
-        ruinStats={ruinStats}
-        monteCarloStats={monteCarloStats}
-        simulationResult={simulationResult}
-        startDate={params.startDate}
-        startingCapital={params.startingCapital}
       />
       <Disclaimer />
     </div>
