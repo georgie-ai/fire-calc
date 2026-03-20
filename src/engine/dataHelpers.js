@@ -13,6 +13,20 @@ const fedFundsMap = new Map(fedFundsData.map(d => [d.date, d.rate]));
 const allSpxDates = spxData.map(d => d.date);
 const allNdxDates = ndxData.map(d => d.date);
 const allCpiDates = cpiData.map(d => d.date);
+const lastCpiDate = allCpiDates[allCpiDates.length - 1];
+const lastCpiValue = cpiMap.get(lastCpiDate);
+
+/**
+ * Get CPI value for a date, falling back to the latest available CPI
+ * when data hasn't been released yet (e.g., SPX has 2026-03 but CPI only has 2026-02).
+ */
+function getCpiOrLatest(dateString) {
+  const val = cpiMap.get(dateString);
+  if (val != null) return val;
+  // If the date is beyond the latest CPI, use the last known value
+  if (dateString > lastCpiDate) return lastCpiValue;
+  return null;
+}
 
 export function getMonthlyReturn(vehicle, dateString) {
   if (vehicle === 'spx') {
@@ -36,15 +50,15 @@ export function getTrailing12MonthInflation(dateString) {
   const [year, month] = dateString.split('-').map(Number);
   const prevYear = year - 1;
   const prevDateStr = `${prevYear}-${String(month).padStart(2, '0')}`;
-  const currentCpi = cpiMap.get(dateString);
-  const prevCpi = cpiMap.get(prevDateStr);
+  const currentCpi = getCpiOrLatest(dateString);
+  const prevCpi = getCpiOrLatest(prevDateStr);
   if (currentCpi == null || prevCpi == null) return 0;
   return (currentCpi / prevCpi) - 1;
 }
 
 export function getCumulativeInflation(startDate, endDate) {
-  const startCpi = cpiMap.get(startDate);
-  const endCpi = cpiMap.get(endDate);
+  const startCpi = getCpiOrLatest(startDate);
+  const endCpi = getCpiOrLatest(endDate);
   if (startCpi == null || endCpi == null) return 1;
   return endCpi / startCpi;
 }
@@ -107,8 +121,8 @@ export function getPairedReturnsAndInflation(vehicle) {
     const prevMonth = month === 1 ? 12 : month - 1;
     const prevYear = month === 1 ? year - 1 : year;
     const prevDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-    const currCpi = cpiMap.get(date);
-    const prevCpi = cpiMap.get(prevDate);
+    const currCpi = getCpiOrLatest(date);
+    const prevCpi = getCpiOrLatest(prevDate);
     const cpiMonthlyRate = (currCpi != null && prevCpi != null)
       ? (currCpi / prevCpi) - 1
       : 0;
