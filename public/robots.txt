@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://canifireyet.com/sitemap.xml
+
+# Compliance pages
+Allow: /privacy
+Allow: /terms
+Allow: /about
+
+# Block crawling of static assets
+Disallow: /assets/

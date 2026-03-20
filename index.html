@@ -4,10 +4,37 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Can I FIRE Yet?</title>
+    <title>Can I FIRE Yet? — Free FIRE Calculator with Historical Market Data</title>
+    <meta name="description" content="Free Financial Independence, Retire Early (FIRE) calculator. Test your retirement plan against 65+ years of real S&P 500 data, Monte Carlo simulations, and inflation-adjusted scenarios." />
+    <meta name="keywords" content="FIRE calculator, financial independence, retire early, retirement calculator, Monte Carlo simulation, probability of ruin, S&P 500, safe withdrawal rate, 4% rule" />
+    <meta name="author" content="Can I FIRE Yet?" />
+    <link rel="canonical" href="https://canifireyet.com/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://canifireyet.com/" />
+    <meta property="og:title" content="Can I FIRE Yet? — Free FIRE Calculator" />
+    <meta property="og:description" content="Test your retirement plan against 65+ years of real market data. Historical analysis and Monte Carlo simulations show your probability of ruin." />
+    <meta property="og:site_name" content="Can I FIRE Yet?" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Can I FIRE Yet? — Free FIRE Calculator" />
+    <meta name="twitter:description" content="Test your retirement plan against 65+ years of real market data. Historical analysis and Monte Carlo simulations show your probability of ruin." />
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // GitHub Pages SPA support: handle redirect from 404.html
+      (function(l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search.slice(1).split('&').map(function(s) {
+            return s.replace(/~and~/g, '&')
+          }).join('?');
+          window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+        }
+      }(window.location))
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

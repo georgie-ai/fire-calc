@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Header from './components/Header';
 import InputPanel from './components/InputPanel';
 import ResultsPanel from './components/ResultsPanel';
+import Footer from './components/Footer';
 import { useSimulation } from './hooks/useSimulation';
 
 const DEFAULT_PARAMS = {
@@ -40,6 +41,7 @@ function App() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
